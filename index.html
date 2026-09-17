@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ServiceHub — On-Demand Local Services Discovery & Booking Platform</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Leaflet CSS & JS for Interactive Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nXC0jkQ2NXCJMBH499j590ZJAecd9at+2A9mgVIc=" crossorigin=""></script>
+
+  <!-- Swiper.js CSS & JS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+  <!-- Flatpickr CSS & JS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    /* Custom scrollbars & smooth map fixes */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .leaflet-popup-content-wrapper {
+      border-radius: 0.75rem;
+      padding: 4px;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    }
+    .toast-animate {
+      animation: slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes slideInUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased font-sans min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
+
+  <!-- TOP HEADER / NAVBAR -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+
+        <!-- Logo & Location Badge -->
+        <div class="flex items-center gap-4 sm:gap-6">
+          <a href="#" id="nav-logo" class="flex items-center gap-2 group">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-indigo-200 group-hover:scale-105 transition-transform">
+              <i data-lucide="layers" class="w-6 h-6"></i>
+            </div>
+            <span class="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-indigo-950 to-indigo-600">
+              ServiceHub
+            </span>
+          </a>
+
+          <!-- Quick Location Selector -->
+          <div class="hidden sm:flex items-center gap-2 bg-slate-100 hover:bg-slate-200/80 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-700 transition cursor-pointer border border-slate-200/80" id="btn-change-location">
+            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-indigo-600"></i>
+            <span id="current-location-text">San Francisco, CA</span>
+            <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400"></i>
+          </div>
+        </div>
+
+        <!-- Center Nav Links -->
+        <nav class="hidden lg:flex items-center gap-1 text-sm font-medium text-slate-600">
+          <button id="nav-home" class="px-3.5 py-2 rounded-xl transition font-semibold hover:bg-slate-100">
+            Explore
+          </button>
+          <button id="nav-search" class="px-3.5 py-2 rounded-xl transition font-medium hover:bg-slate-100">
+            Marketplace
+          </button>
+          <button id="nav-emergency" class="px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 text-amber-700 font-semibold bg-amber-50 hover:bg-amber-100/80 border border-amber-200/60">
+            <i data-lucide="zap" class="w-4 h-4 fill-amber-400 text-amber-500"></i> 24/7 Emergency
+          </button>
+        </nav>
+
+        <!-- Right Side User Actions & Mode Switcher -->
+        <div class="flex items-center gap-2 sm:gap-3">
+
+          <!-- Role Switcher Toggle -->
+          <div class="bg-slate-100 p-1 rounded-xl flex items-center border border-slate-200/90 text-xs font-semibold shadow-inner">
+            <button id="role-customer-btn" class="px-3 py-1.5 rounded-lg bg-white text-indigo-700 shadow-sm transition font-bold flex items-center gap-1.5">
+              <i data-lucide="user" class="w-3.5 h-3.5"></i> <span class="hidden xs:inline">Customer</span>
+            </button>
+            <button id="role-provider-btn" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5">
+              <i data-lucide="briefcase" class="w-3.5 h-3.5"></i> <span class="hidden xs:inline">Provider</span>
+            </button>
+          </div>
+
+          <!-- Customer View Actions -->
+          <div id="customer-nav-actions" class="flex items-center gap-1.5 sm:gap-2">
+            <!-- Notifications Bell -->
+            <button id="btn-notifications" class="relative p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition">
+              <i data-lucide="bell" class="w-5 h-5"></i>
+              <span id="notif-badge" class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white"></span>
+            </button>
+
+            <!-- Saved Pros Button -->
+            <button id="btn-saved-pros" class="hidden md:flex p-2 text-slate-600 hover:text-rose-600 hover:bg-slate-100 rounded-xl transition relative" title="Saved Professionals">
+              <i data-lucide="heart" class="w-5 h-5"></i>
+              <span id="saved-badge" class="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center">2</span>
+            </button>
+
+            <!-- Customer Dashboard Button -->
+            <button id="btn-customer-dash" class="hidden sm:flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition border border-indigo-200/80">
+              <i data-lucide="layout-dashboard" class="w-4 h-4 text-indigo-600"></i>
+              <span>Dashboard</span>
+            </button>
+          </div>
+
+          <!-- Mobile Menu Button -->
+          <button id="btn-mobile-menu" class="lg:hidden p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl">
+            <i data-lucide="menu" class="w-6 h-6"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Drawer Nav -->
+    <div id="mobile-menu-drawer" class="lg:hidden hidden bg-white border-b border-slate-200 px-4 pt-2 pb-4 space-y-2 shadow-lg">
+      <button id="mobile-nav-home" class="w-full text-left px-3 py-2 rounded-lg font-medium hover:bg-slate-100 flex items-center gap-2">
+        <i data-lucide="home" class="w-4 h-4 text-slate-500"></i> Home Explore
+      </button>
+      <button id="mobile-nav-search" class="w-full text-left px-3 py-2 rounded-lg font-medium hover:bg-slate-100 flex items-center gap-2">
+        <i data-lucide="search" class="w-4 h-4 text-slate-500"></i> Services Marketplace
+      </button>
+      <button id="mobile-nav-emergency" class="w-full text-left px-3 py-2 rounded-lg font-medium hover:bg-amber-50 text-amber-700 flex items-center gap-2">
+        <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i> 24/7 Emergency Services
+      </button>
+      <button id="mobile-nav-dash" class="w-full text-left px-3 py-2 rounded-lg font-medium hover:bg-indigo-50 text-indigo-700 flex items-center gap-2">
+        <i data-lucide="layout-dashboard" class="w-4 h-4 text-indigo-600"></i> My Dashboard
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <main id="app-content" class="flex-1 w-full relative">
+    <!-- View content loaded dynamically -->
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="bg-slate-900 text-slate-400 text-sm border-t border-slate-800 mt-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div>
+          <div class="flex items-center gap-2 text-white font-bold text-lg mb-4">
+            <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
+              <i data-lucide="layers" class="w-5 h-5"></i>
+            </div>
+            ServiceHub
+          </div>
+          <p class="text-slate-400 text-xs leading-relaxed">
+            On-demand local services discovery and instant booking platform. Connecting top-rated local professionals with homeowners, businesses, and individuals.
+          </p>
+        </div>
+
+        <div>
+          <h4 class="text-white font-semibold mb-3 text-xs uppercase tracking-wider">Popular Services</h4>
+          <ul class="space-y-2 text-xs">
+            <li><a href="#" class="hover:text-white transition">Emergency Electricians</a></li>
+            <li><a href="#" class="hover:text-white transition">Licensed Plumbers</a></li>
+            <li><a href="#" class="hover:text-white transition">Home Eco Cleaning</a></li>
+            <li><a href="#" class="hover:text-white transition">Mobile Car Mechanics</a></li>
+            <li><a href="#" class="hover:text-white transition">Local Moving Services</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="text-white font-semibold mb-3 text-xs uppercase tracking-wider">For Professionals</h4>
+          <ul class="space-y-2 text-xs">
+            <li><a href="#" class="hover:text-white transition">Become a Service Partner</a></li>
+            <li><a href="#" class="hover:text-white transition">Provider Dashboard App</a></li>
+            <li><a href="#" class="hover:text-white transition">Verification & Badging</a></li>
+            <li><a href="#" class="hover:text-white transition">Pro Success Stories</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="text-white font-semibold mb-3 text-xs uppercase tracking-wider">Trust & Safety</h4>
+          <ul class="space-y-2 text-xs">
+            <li><a href="#" class="hover:text-white transition">Service Guarantee</a></li>
+            <li><a href="#" class="hover:text-white transition">Verified Profiles & Background Checks</a></li>
+            <li><a href="#" class="hover:text-white transition">Secure Payment Hold</a></li>
+            <li><a href="#" class="hover:text-white transition">24/7 Customer Support</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="border-t border-slate-800 mt-8 pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500">
+        <p>&copy; 2025 ServiceHub Inc. All rights reserved.</p>
+        <div class="flex gap-6 mt-4 sm:mt-0">
+          <a href="#" class="hover:text-slate-300">Privacy Policy</a>
+          <a href="#" class="hover:text-slate-300">Terms of Service</a>
+          <a href="#" class="hover:text-slate-300">Cookie Settings</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- NOTIFICATIONS MODAL / DRAWER -->
+  <div id="notifications-drawer" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" id="notif-backdrop"></div>
+    <div class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl flex flex-col border-l border-slate-200">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <i data-lucide="bell" class="w-5 h-5 text-indigo-600"></i>
+          <h3 class="font-bold text-slate-900">Notifications</h3>
+        </div>
+        <button id="btn-close-notif" class="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-4 space-y-3" id="notifications-list">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- LOCATION CHANGE MODAL -->
+  <div id="location-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" id="location-backdrop"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-100 z-10">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
+          <i data-lucide="map-pin" class="w-5 h-5 text-indigo-600"></i> Select Location
+        </h3>
+        <button id="btn-close-location" class="p-1 text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <p class="text-xs text-slate-500 mb-4">Set your location to see nearby professionals, accurate pricing, and instant booking availability.</p>
+
+      <div class="space-y-3">
+        <div class="relative">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3.5 text-slate-400"></i>
+          <input type="text" id="input-location-modal" placeholder="Enter city, neighborhood, or ZIP code" value="San Francisco, CA" class="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <button id="btn-detect-location" class="w-full py-2.5 px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition border border-indigo-200/60">
+          <i data-lucide="crosshair" class="w-4 h-4"></i> Use My Current Location (GPS)
+        </button>
+      </div>
+
+      <div class="mt-6 flex justify-end gap-2">
+        <button id="btn-save-location" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-md transition">
+          Update Location
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOOKING MODAL / DRAWER -->
+  <div id="booking-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" id="booking-backdrop"></div>
+    <div class="relative min-h-screen flex items-center justify-center p-4">
+      <div class="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 sm:p-8 overflow-hidden border border-slate-100 my-8" id="booking-modal-container">
+        <!-- Step content injected dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- MAIN APP MODULE SCRIPT -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
